@@ -1347,6 +1347,7 @@ var staff = [];
 var selectedMaker = 'all';
 var editingOrderId = null;
 var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycby5XN7P-NSsoZ76bMj_Veyf7LLAENUJizW8W-8T99MygaAghbpMzYGdBhJ7YjknQklg/exec';
+var GAS_URL_VERSION = 1; // バージョン管理フラグ
 var currentSyncUrl = '';
 
 // ===== 起動処理 =====
@@ -1372,10 +1373,12 @@ function initApp() {
 // ===== LOCALSTORAGE & SYNC UTILS =====
 function loadLocalConfiguration() {
   var savedUrl = localStorage.getItem('ecore_gas_url');
+  var savedVersion = parseInt(localStorage.getItem('ecore_gas_url_version'), 10) || 0;
   
-  // HTMLソースのデフォルトURL（GitHub上の最新URL）が更新された場合、LocalStorageの古いURLを自動で同期更新する
-  if (DEFAULT_GAS_URL && savedUrl !== DEFAULT_GAS_URL) {
+  // 配信バージョンが更新された場合のみ自動上書きし、ユーザーが手動で設定した本物URLは上書きされないよう保護する
+  if (DEFAULT_GAS_URL && (!savedUrl || savedVersion < GAS_URL_VERSION)) {
     localStorage.setItem('ecore_gas_url', DEFAULT_GAS_URL);
+    localStorage.setItem('ecore_gas_url_version', GAS_URL_VERSION);
     savedUrl = DEFAULT_GAS_URL;
   }
   
@@ -2552,6 +2555,7 @@ function saveSyncSettings() {
         if (resData.status === "success" || resData.products) {
           currentSyncUrl = gasUrl;
           localStorage.setItem('ecore_gas_url', gasUrl);
+          localStorage.setItem('ecore_gas_url_version', GAS_URL_VERSION);
           updateSyncStatusBadge();
           
            // データ読み込みをトリガー
