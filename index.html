@@ -1329,6 +1329,7 @@ var DEFAULT_STAFF = [{ name: '馬場英一' }, { name: '柿森純一' }, { name:
 var staff = [];
 var selectedMaker = 'all';
 var editingOrderId = null;
+var DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycby5XN7P-NSsoZ76bMj_Veyf7LLAENUJizW8W-8T99MygaAghbpMzYGdBhJ7YjknQklg/exec';
 var currentSyncUrl = '';
 
 // ===== 起動処理 =====
@@ -1340,7 +1341,7 @@ function initApp() {
   loadLocalConfiguration();
   loadData();
   
-  // 以前のセッションチェック
+  // ログイン画面のセッション復元
   var savedRole = localStorage.getItem('ecore_role');
   var savedUser = localStorage.getItem('ecore_user');
   if (savedRole && savedUser) {
@@ -1353,7 +1354,15 @@ function initApp() {
 
 // ===== LOCALSTORAGE & SYNC UTILS =====
 function loadLocalConfiguration() {
-  currentSyncUrl = localStorage.getItem('ecore_gas_url') || 'https://script.google.com/macros/s/AKfycy5XN7P-NSsoZ76bMj_Veyf7LLAENUJizW8W-8T99MygaAghbpMzYGdBhJ7YjKNqklg/exec';
+  var savedUrl = localStorage.getItem('ecore_gas_url');
+  
+  // HTMLソースのデフォルトURL（GitHub上の最新URL）が更新された場合、LocalStorageの古いURLを自動で同期更新する
+  if (DEFAULT_GAS_URL && savedUrl !== DEFAULT_GAS_URL) {
+    localStorage.setItem('ecore_gas_url', DEFAULT_GAS_URL);
+    savedUrl = DEFAULT_GAS_URL;
+  }
+  
+  currentSyncUrl = savedUrl || DEFAULT_GAS_URL || '';
   document.getElementById('sync-gas-url').value = currentSyncUrl;
   
   var notifyMethod = localStorage.getItem('ecore_notify_method') || 'sound';
