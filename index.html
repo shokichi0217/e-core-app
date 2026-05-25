@@ -926,6 +926,7 @@ textarea {
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="switchTab('orders')">注文管理</button>
     <button class="nav-tab admin-only" onclick="switchTab('products')" style="display:none">商品マスタ</button>
+    <button class="nav-tab admin-only" onclick="switchTab('staff-master')" style="display:none">スタッフ管理</button>
   </div>
   <div style="display:flex;align-items:center;gap:16px">
     <div style="display:flex;gap:20px;align-items:center">
@@ -1013,6 +1014,26 @@ textarea {
       </label>
     </div>
     <div id="productsGrid"></div>
+  </div>
+
+  <!-- スタッフ管理セクション -->
+  <div class="page-section" id="section-staff-master">
+    <div class="page-title">スタッフ管理</div>
+    
+    <div class="form-grid" style="background:#fff; border:1px solid var(--border); border-radius:18px; padding:24px; margin-bottom:20px; max-width: 600px;">
+      <div style="font-weight:700; font-size:16px; margin-bottom:16px; color:var(--text)">新しいスタッフを登録</div>
+      <div style="display:flex; gap:12px; align-items:center">
+        <input type="text" id="newStaffName" class="search-box" style="flex:1; margin:0" placeholder="スタッフ名を入力...">
+        <button class="btn btn-primary" onclick="addStaffMember()" style="margin:0">＋ 追加する</button>
+      </div>
+    </div>
+
+    <div style="background:#fff; border:1px solid var(--border); border-radius:18px; padding:24px; max-width: 600px;">
+      <div style="font-weight:700; font-size:16px; margin-bottom:16px; color:var(--text)">スタッフ一覧</div>
+      <div id="staffListContainer" style="display:flex; flex-direction:column; gap:10px">
+        <!-- 動的に流し込み -->
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1304,6 +1325,8 @@ var currentUser = null;
 var orders = [];
 var products = [];
 var favorites = [];
+var DEFAULT_STAFF = [{ name: '馬場英一' }, { name: '柿森純一' }, { name: '城谷茂利' }];
+var staff = [];
 var selectedMaker = 'all';
 var editingOrderId = null;
 var currentSyncUrl = '';
@@ -1363,13 +1386,22 @@ function loadData() {
     if (!localProds) {
       localStorage.setItem('products_v1', JSON.stringify(DEFAULT_PRODUCTS));
     }
+    
+    var localStaff = localStorage.getItem('staff_v1');
+    staff = localStaff ? JSON.parse(localStaff) : DEFAULT_STAFF;
+    if (!localStaff) {
+      localStorage.setItem('staff_v1', JSON.stringify(DEFAULT_STAFF));
+    }
   } catch(e) {
     orders = [];
     products = DEFAULT_PRODUCTS;
+    staff = DEFAULT_STAFF;
   }
   
   renderTable();
   renderProducts();
+  renderStaffDropdowns();
+  renderStaffList();
   populateCategoryFilters();
   
   // GAS設定済みの場合はサーバーから最新データを取得同期
@@ -1397,9 +1429,15 @@ function fetchFromServer() {
           var userFav = resData.favorites.find(function(f) { return f.staff === currentUser; });
           favorites = userFav ? userFav.productNames : [];
         }
+        if (resData.staff && resData.staff.length > 0) {
+          staff = resData.staff;
+          localStorage.setItem('staff_v1', JSON.stringify(staff));
+        }
         
         renderTable();
         renderProducts();
+        renderStaffDropdowns();
+        renderStaffList();
         populateCategoryFilters();
         showNotification("🔄 同期完了", "Googleスプレッドシートから最新データを取得しました。");
       }
@@ -1573,20 +1611,27 @@ function loadFavoritesForUser() {
 function switchTab(tab) {
   var sectOrders = document.getElementById('section-orders');
   var sectProducts = document.getElementById('section-products');
+  var sectStaff = document.getElementById('section-staff-master');
   var tabs = document.querySelectorAll('.nav-tab');
   
   tabs.forEach(function(t) { t.classList.remove('active'); });
   
+  sectOrders.classList.remove('active');
+  sectProducts.classList.remove('active');
+  sectStaff.classList.remove('active');
+  
   if (tab === 'orders') {
     sectOrders.classList.add('active');
-    sectProducts.classList.remove('active');
     tabs[0].classList.add('active');
     renderTable();
-  } else {
-    sectOrders.classList.remove('active');
+  } else if (tab === 'products') {
     sectProducts.classList.add('active');
     tabs[1].classList.add('active');
     renderProducts();
+  } else if (tab === 'staff-master') {
+    sectStaff.classList.add('active');
+    tabs[2].classList.add('active');
+    renderStaffList();
   }
 }
 
@@ -2483,14 +2528,18 @@ function saveSyncSettings() {
           localStorage.setItem('ecore_gas_url', gasUrl);
           updateSyncStatusBadge();
           
-          // データ読み込みをトリガー
+           // データ読み込みをトリガー
           if (resData.products) products = resData.products;
           if (resData.orders) orders = resData.orders;
+          if (resData.staff) staff = resData.staff;
           localStorage.setItem('products_v1', JSON.stringify(products));
           localStorage.setItem('orders_v1', JSON.stringify(orders));
+          localStorage.setItem('staff_v1', JSON.stringify(staff));
           
           renderTable();
           renderProducts();
+          renderStaffDropdowns();
+          renderStaffList();
           populateCategoryFilters();
           
           showAlert("接続に成功しました！Googleスプレッドシートとの自動データ同期が有効になりました。");
@@ -2579,6 +2628,105 @@ function playNotificationSound() {
   } catch(e) {
     console.warn("AudioContext notification failed:", e);
   }
+}
+
+// ===== STAFF MASTER MANAGEMENT =====
+function renderStaffDropdowns() {
+  var loginStaff = document.getElementById('loginStaffName');
+  var staffFilter = document.getElementById('staffFilter');
+  var formStaff = document.getElementById('f-staff');
+  
+  var prevLoginVal = loginStaff ? loginStaff.value : '';
+  var prevFilterVal = staffFilter ? staffFilter.value : 'all';
+  var prevFormVal = formStaff ? formStaff.value : '';
+  
+  if (loginStaff) {
+    loginStaff.innerHTML = '<option value="">-- 選択してください --</option>';
+    staff.forEach(function(s) {
+      loginStaff.innerHTML += '<option value="' + esc(s.name) + '">' + esc(s.name) + '</option>';
+    });
+    if (prevLoginVal) loginStaff.value = prevLoginVal;
+  }
+  
+  if (staffFilter) {
+    staffFilter.innerHTML = '<option value="all">全員の担当</option>';
+    staff.forEach(function(s) {
+      staffFilter.innerHTML += '<option value="' + esc(s.name) + '">' + esc(s.name) + '</option>';
+    });
+    if (prevFilterVal) staffFilter.value = prevFilterVal;
+  }
+  
+  if (formStaff) {
+    formStaff.innerHTML = '<option value="">-- 選択してください --</option>';
+    staff.forEach(function(s) {
+      formStaff.innerHTML += '<option value="' + esc(s.name) + '">' + esc(s.name) + '</option>';
+    });
+    if (prevFormVal) formStaff.value = prevFormVal;
+  }
+}
+
+function renderStaffList() {
+  var container = document.getElementById('staffListContainer');
+  if (!container) return;
+  
+  if (staff.length === 0) {
+    container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text2)">登録されているスタッフがいません。</div>';
+    return;
+  }
+  
+  container.innerHTML = '';
+  staff.forEach(function(s) {
+    var item = document.createElement('div');
+    item.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:12px 18px; background:var(--surface2); border:1px solid var(--border); border-radius:12px';
+    item.innerHTML = `
+      <span style="font-weight:600; font-size:15px; color:var(--text)">${esc(s.name)}</span>
+      <button class="btn btn-ghost" onclick="deleteStaffMember('${esc(s.name)}')" style="color:var(--red); padding:4px 8px; font-size:13px; margin:0">削除</button>
+    `;
+    container.appendChild(item);
+  });
+}
+
+function addStaffMember() {
+  var input = document.getElementById('newStaffName');
+  if (!input) return;
+  var name = input.value.trim();
+  
+  if (!name) {
+    showAlert("スタッフ名を入力してください。");
+    return;
+  }
+  
+  var exists = staff.some(function(s) { return s.name === name; });
+  if (exists) {
+    showAlert("そのスタッフ名はすでに登録されています。");
+    return;
+  }
+  
+  var newStaff = { name: name };
+  staff.push(newStaff);
+  localStorage.setItem('staff_v1', JSON.stringify(staff));
+  
+  input.value = '';
+  renderStaffDropdowns();
+  renderStaffList();
+  
+  postToServer('saveStaff', newStaff, function() {
+    showNotification("👤 スタッフ追加", name + "様をスタッフリストに登録し、同期しました。");
+  });
+}
+
+function deleteStaffMember(name) {
+  showConfirm(name + "様をスタッフリストから削除しますか？\n（注：これまでの注文履歴データは削除されません）", function() {
+    staff = staff.filter(function(s) { return s.name !== name; });
+    localStorage.setItem('staff_v1', JSON.stringify(staff));
+    
+    renderStaffDropdowns();
+    renderStaffList();
+    
+    postToServer('deleteStaff', { name: name }, function() {
+      showNotification("👤 スタッフ削除", name + "様をスタッフリストから削除し、同期しました。");
+    });
+  });
 }
 </script>
 </body>
