@@ -899,8 +899,52 @@ textarea {
   .toolbar .search-box, .toolbar select.filter-select, .toolbar .btn { width: 100%; }
   .modal { width: 96vw !important; max-height: 94vh; }
   .login-box { padding: 32px 24px 28px; }
-  .item-row { grid-template-columns: 1fr; gap: 8px; }
-  .remove-item-btn { width: 100%; height: 38px; }
+  .item-row {
+    grid-template-columns: 80px 1fr auto;
+    gap: 12px 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 14px;
+    align-items: end;
+  }
+  .item-row > :nth-child(1) {
+    grid-column: 1 / -1;
+  }
+  .item-row > :nth-child(2) {
+    position: relative;
+    padding-top: 18px;
+  }
+  .item-row > :nth-child(2)::before {
+    content: "個数";
+    position: absolute;
+    top: 0; left: 2px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text2);
+  }
+  .item-row > :nth-child(3) {
+    position: relative;
+    padding-top: 18px;
+  }
+  .item-row > :nth-child(3)::before {
+    content: "単価 (税別)";
+    position: absolute;
+    top: 0; left: 2px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text2);
+  }
+  .item-row > :nth-child(4) {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 38px;
+  }
+  .remove-item-btn {
+    width: 38px; height: 38px;
+  }
 }
 </style>
 </head>
